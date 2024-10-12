@@ -1,134 +1,119 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
-
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
-}
-
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
+import { Plugin, TFile, TAbstractFile, WorkspaceLeaf, Editor, MarkdownView} from 'obsidian';
+//  导入依赖的类
+import {CommitMessage} from './modals';
+export default class PkgImgSync extends Plugin {
 	async onload() {
-		await this.loadSettings();
+		// 监听粘贴事件
+		this.registerEvent(
+			/*
+			* this.app 当前插件的应用实例
+			* this.app.workspace 是 Obsidian 工作区的实例。工作区管理所有的视图（如 Markdown 视图、文件浏览器视图等）和叶子节点（即工作区中的各个面板）。
+			* .on 注册监听事件
+			* editor-paste 监听粘贴事件
+			* this.handlePaste.bind(this)  监听事件回调方法，this是实例的对象。
+			* */
+			this.app.workspace.on('editor-paste', this.handlePaste.bind(this))
+		);
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
+	}
+	async initCommand(){
+		// 添加暂存区命令
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
+			id:"pkg-git-add",
+			name: "git add : 将更改添加到本地暂存区",
+			callback:()=>{
+				// 打开模态框
+				new CommitMessage(this.app).open();
+				this.addChange();
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
+		// 提交更改命令
+		this.addCommand({
+			id:"pkd-git-commit",
+			name: "git commit : 提交更改到本地git仓库",
+			callback:()=>{
+				this.commit();
+			}
 		});
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// 推送到远程
+		this.addCommand({
+			id:"pkg-git-push",
+			name: "git push : 将本地更改推送到远程",
+			callback:()=>{
+				this.push();
+			}
+		});
+
+		// 快速推送
+		this.addCommand({
+			id:"pkg-git-push-quickly",
+			name: "git push quickly: 使用默认消息直接将本地更改提交到远程",
+			callback:()=>{
+				this.quickPush();
+			}
+		});
+	}
+	async onunload() {
+		console.log('Image Upload Plugin unloaded');
 	}
 
-	onunload() {
-
+	async handlePaste(event: ClipboardEvent, leaf: WorkspaceLeaf) {
+		event.preventDefault();
+		if (event.clipboardData && event.clipboardData.files.length > 0) {
+			const file = event.clipboardData.files[0];   // 从剪切板读取数据
+			if (file.type.startsWith('image/')) {  // 如果是图片
+				const imageUrl = await this.uploadImage(file);  // 上传图片
+				console.log("img url : ",imageUrl);
+				this.insertImageUrl(imageUrl, leaf);
+			}
+		}
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	async uploadImage(file: File): Promise<string> {
+		const formData = new FormData();
+		formData.append('img', file);
+
+		const response = await fetch('https://pic.xiaodu0.com/api/files/upload', {
+			method: 'POST',
+			body: formData,
+		});
+
+		if (response.ok) {
+			const data = await response.json();
+			return data.url; // 假设服务器返回一个包含url的对象
+		} else {
+			throw new Error('Failed to upload image');
+		}
 	}
 
-	async saveSettings() {
-		await this.saveData(this.settings);
+	async insertImageUrl(url: string, leaf: WorkspaceLeaf) {
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);   // Markdown视图的实例
+		// @ts-ignore
+		const editor = view.editor;  // Markdown 编辑器的实例
+		if (editor) {  // 如果编辑器激活
+			const cursor = editor.getCursor();  //
+			const imageUrl = `![小杜的图床](${url})`;
+
+			// 插入图像链接
+			editor.replaceSelection(imageUrl);
+
+			// 移动光标到插入内容的末尾
+			editor.setCursor(cursor.line, cursor.ch + imageUrl.length);
+		}
 	}
-}
+	async addChange(){
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
 	}
+	async commit(){
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
 	}
+	async push(){
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
 	}
-}
+	async quickPush(){
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
 	}
 }
