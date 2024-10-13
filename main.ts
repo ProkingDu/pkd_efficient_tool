@@ -1,7 +1,22 @@
-import { Plugin, TFile, TAbstractFile, WorkspaceLeaf, Editor, MarkdownView} from 'obsidian';
+import {
+	Plugin,
+	TFile,
+	TAbstractFile,
+	WorkspaceLeaf,
+	Editor,
+	MarkdownView,
+	PluginSettingTab,
+	Setting,
+	Notice
+} from 'obsidian';
 //  导入依赖的类
 import {CommitMessage} from './modals';
-export default class PkgImgSync extends Plugin {
+import {GIT_SETTING,GitSetting,PictureBedSetting,GitSettingTab} from "./settings";
+import * as path from 'path';
+import * as childProcess from 'child_process';
+
+export default class PkgEasyTool extends Plugin {
+	git_setting: GitSetting;
 	async onload() {
 		// 监听粘贴事件
 		this.registerEvent(
@@ -14,8 +29,12 @@ export default class PkgImgSync extends Plugin {
 			* */
 			this.app.workspace.on('editor-paste', this.handlePaste.bind(this))
 		);
-
-
+		// 加载命令
+		await this.initCommand()
+		// 加载设置项
+		await this.loadSetting()
+		// 添加设置选项卡
+		this.addSettingTab(new GitSettingTab(this.app, this));
 	}
 	async initCommand(){
 		// 添加暂存区命令
@@ -114,6 +133,25 @@ export default class PkgImgSync extends Plugin {
 
 	}
 	async quickPush(){
+		const vaultPath = this.app.vault.getRoot().vault.adapter.basePath
+		// 获取数据目录路径
+		console.log(vaultPath);
+		// 添加所有文件到暂存区
+		childProcess.execSync('git add .', { cwd: vaultPath });
+
+		// 提交更改
+		childProcess.execSync(`git commit -am "test"`, { cwd: vaultPath });
+
+		// 推送到远程仓库
+		childProcess.execSync('git push --force origin main', { cwd: vaultPath });
+
+		new Notice('Git push successful!');
+	}
+	async loadSetting(){
+		// 加载Git设置项目
+		this.git_setting = Object.assign({}, GIT_SETTING, await this.loadData());
+	}
+	async saveGitSetting(){
 
 	}
 }
