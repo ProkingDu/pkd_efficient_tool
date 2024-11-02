@@ -42,15 +42,6 @@ export class GitSettingTab extends PluginSettingTab {
 		new Setting(gitGroup)
 			.setClass("group-header")
 			.setName('Git相关')
-		// 是否启用Git
-		// new Setting(gitGroup)
-		// 	.setName('Toggle')
-		// 	.setDesc('是否启用Git')
-		// 	.addToggle(toggle => toggle
-		// 		.setValue(true)
-		// 		.onChange(value => {
-		// 			console.log('Toggle state:', value);
-		// 		}));
 		new Setting(gitGroup)
 			.setName('仓库地址')
 			.setDesc('远程仓库地址')
@@ -60,6 +51,42 @@ export class GitSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.git_setting.remoteAddr)
 				.onChange(async (value) => {
 					this.plugin.git_setting.remoteAddr = value;
+					await this.plugin.saveGitSetting();
+				}));
+		// 添加是否启用快捷Git命令设置
+		new Setting(gitGroup)
+			.setName('是否启用快捷Git命令')
+			.setDesc('启用后可以在插件中快速执行Git命令')
+			.setClass("pkd-setting-item")
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.git_setting.enableQuickCommands)
+				.onChange(async (value) => {
+					this.plugin.git_setting.enableQuickCommands = value;
+					await this.plugin.saveGitSetting();
+				}));
+
+// 添加默认提交消息设置
+		new Setting(gitGroup)
+			.setName('默认提交消息')
+			.setDesc('设置默认的提交消息')
+			.setClass("pkd-setting-item")
+			.addText(text => text
+				.setPlaceholder('默认提交消息')
+				.setValue(this.plugin.git_setting.defaultCommitMessage)
+				.onChange(async (value) => {
+					this.plugin.git_setting.defaultCommitMessage = value;
+					await this.plugin.saveGitSetting();
+				}));
+
+// 添加是否启用关闭编辑器时自动提交设置
+		new Setting(gitGroup)
+			.setName('是否启用关闭编辑器时自动提交')
+			.setDesc('启用后，关闭编辑器时会自动提交更改')
+			.setClass("pkd-setting-item")
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.git_setting.autoCommitOnClose)
+				.onChange(async (value) => {
+					this.plugin.git_setting.autoCommitOnClose = value;
 					await this.plugin.saveGitSetting();
 				}));
 	}

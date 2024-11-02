@@ -140,7 +140,7 @@ export default class PkgEasyTool extends Plugin {
 		childProcess.execSync('git add .', { cwd: vaultPath });
 
 		// 提交更改
-		childProcess.execSync(`git commit -am "test"`, { cwd: vaultPath });
+		childProcess.execSync(`git commit -m "test11"`, { cwd: vaultPath });
 
 		// 推送到远程仓库
 		childProcess.execSync('git push --force origin main', { cwd: vaultPath });
