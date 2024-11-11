@@ -80,14 +80,19 @@ export default class PkgEasyTool extends Plugin {
 	}
 
 	async handlePaste(event: ClipboardEvent, leaf: WorkspaceLeaf) {
-		event.preventDefault();
+		// 检查剪贴板中是否包含文件
 		if (event.clipboardData && event.clipboardData.files.length > 0) {
-			const file = event.clipboardData.files[0];   // 从剪切板读取数据
-			if (file.type.startsWith('image/')) {  // 如果是图片
-				const imageUrl = await this.uploadImage(file);  // 上传图片
-				console.log("img url : ",imageUrl);
+			const file = event.clipboardData.files[0];
+			if (file.type.startsWith('image/')) {
+				// 如果是图片，则阻止默认行为并处理图片粘贴
+				event.preventDefault();
+				const imageUrl = await this.uploadImage(file);
+				console.log("img url : ", imageUrl);
 				this.insertImageUrl(imageUrl, leaf);
 			}
+		} else {
+			// 如果不是文件（例如纯文本），保留默认行为
+			console.log("Pasting non-image content.");
 		}
 	}
 
